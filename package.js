@@ -15,9 +15,9 @@ Package.onUse(function (api) {
 });
 
 Package.on_test(function (api) {
-  api.use('astronome', 'server');
-  api.use('williamledoux:tinytest', 'server');
+  api.use('williamledoux:astronome', 'server');
+  api.use('williamledoux:tinytest-tools', 'server');
+  api.use('tinytest', 'server');
   api.use('test-helpers', 'server');
-  //api.use('tinytest-tools', 'server');
   api.add_files('astronome_tests.js', 'server');
 });
