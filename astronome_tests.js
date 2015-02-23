@@ -392,6 +392,8 @@ function IsFailedToForgetNotSourceDirectoryError(actual)	{ if(actual.error === A
 		//---
 		var params = getDefaultParams(test, sourceADir);
 
+		var oldFolderCount = Directories.find({}).count();
+		var oldFileCount = Files.find({}).count();
 		test.isUndefined(fs.unlinkSync(sourceADir+'dirA/subE/fileE'));
 		test.isUndefined(fs.unlinkSync(sourceADir+'dirA/subE/'+params.idFilename));
 		test.isUndefined(fs.unlinkSync(sourceADir+'dirA/subE/subsubF/fileF'));
@@ -404,6 +406,9 @@ function IsFailedToForgetNotSourceDirectoryError(actual)	{ if(actual.error === A
 		Astronome.parse(params);
 		//---
 		CBW.wait(onComplete, 10); // wait to see if too many callbacks are called
+		//---
+		test.equal(Directories.find({}).count(), oldFolderCount-2, "the 2 deleted folders should have been removed from database");
+		test.equal(Files.find({}).count(), oldFileCount-2, "the 2 deleted files should have been removed from database");
 	});
 
 	//-------------------------------------------
