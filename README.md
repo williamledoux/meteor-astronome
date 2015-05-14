@@ -147,9 +147,9 @@ Will check that provided params are valid, and create default values for missing
 
 ## TODO
 
-[ ] Remove `recursive-fs` dependency that is only used in tests
-[ ] Add depth control `maxDepth` to recursive parsing
-[ ] Add function to use filesystem events instead of periodical reparsing
+ * Remove `recursive-fs` dependency that is only used in tests
+ * Add depth control `maxDepth` to recursive parsing
+ * Add function to use filesystem events instead of periodical reparsing
 
 
 Changelog
