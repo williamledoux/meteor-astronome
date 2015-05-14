@@ -1,4 +1,4 @@
-# astronome v0.1.0
+# Astronome v0.2.0
 
 Meteor server-side package for populating `Meteor.Collections` with informations on existing system directories and files, without touching (almost) anything, and without preventing normal interaction with those files and directories through filesystem. 
 
