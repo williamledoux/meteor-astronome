@@ -25,14 +25,15 @@ Usecases: indexing and adding metadatas to personnal files (pictures, videos, wh
 				'idFilename'								: '.astronomeid'
 				'directoryCollection'				: Directories,
 				'fileCollection'						: Files,
-				'onDirectoryAddedBeforeCB'	: function(userdata, directoryfullpath){ return true; }
-				'onDirectoryAddedAfterCB'		: function(userdata, directory){ Directories.update(directory, {some:metadatas});},
-				'onDirectoryDeletedCB'			: function(userdata, directory){ return true; },
-				'onDirectoryMovedCB'				: function(userdata, directory, olddirectorypath){ },
-				'onFileAddedBeforeCB'				: function(userdata, filefullpath){ return true},
-				'onFileAddedAfterCB'				: function(userdata, file){ },
-				'onFileDeletedCB'						: function(userdata, file){ },
-				'onFileChangedCB'						: function(userdata, file){ },
+				'onDirectoryAddedBeforeCB'	: function(directoryfullpath){ return true; }
+				'onDirectoryAddedAfterCB'		: function(directory){ Directories.update(directory, {some:metadatas});},
+				'onDirectoryDeletedCB'			: function(directory){ return true; },
+				'onDirectoryMovedCB'				: function(directory, olddirectorypath){ },
+				'onFileAddedBeforeCB'				: function(filefullpath){ return true},
+				'onFileAddedAfterCB'				: function(file){ },
+				'onFileDeletedCB'						: function(file){ console.log(this.someUserData); },
+				'onFileChangedCB'						: function(file){ },
+				'someUserData'							: 42,
 			});
 			// Parse directory every minute
 			Meteor.setInterval(function(){
@@ -49,6 +50,9 @@ Usecases: indexing and adding metadatas to personnal files (pictures, videos, wh
 
 ### Parameters
 
+The parameters object mainly tells `Astronome` what collection to feed and what callbacks to call.
+The fields described below are the one that will be read by `Astronome`.
+
 #### sourcePath `required`
 Must be a string containing the disk path of the existing 'source' directory (that is to be recursively tracked).
  
@@ -61,84 +65,81 @@ Must be a valid Meteor.Collection to store informations on Files
 #### idFilename `default is ".astronomeid"`
 Must be a string containing the name of the file that will be created in each subdirectory and contain the id of this subdirectory in the `directoryCollection`
  
-#### onDirectoryAddedBeforeCB(userdata, fulldirectorypath) `optional`
+#### onDirectoryAddedBeforeCB(fulldirectorypath) `optional`
 
  * Called by the `parse` function for each directory that is not tracked in `directoryCollection`.
  * Return value controls whether the subdirectory should be tracked (`true`) or not (`false`).
  * If this callback is not defined, all directories will be tracked.
  * Not called for the source directory (that is never tracked)
- * `userdata` as provided to the `parse` function.
  
-#### onDirectoryAddedAfterCB(userdata, directory) `optional`
+#### onDirectoryAddedAfterCB(directory) `optional`
  
  * If defined, called by the `parse` function just after the `directory` object has been inserted to the `directoryCollection`.
  * Return value isn't used.
- * `userdata` as provided to the `parse` function.
  
-#### onDirectoryDeletedCB(userdata, directory) `optional`
+#### onDirectoryDeletedCB(directory) `optional`
 
  * Called by the `parse` function for each tracked `directory` that is missing on the filesystem
  * Return value controls whether the `directory` is removed from database (`true`) or keeped with a null source (`false`).
  * If this callback is not defined, all missing directories will be removed from database.
- * `userdata` as provided to the `parse` function.
  
-#### onDirectoryMovedCB(userdata, directory, oldDirectoryPath) `optional`
+#### onDirectoryMovedCB(directory, oldDirectoryPath) `optional`
 
  * If defined, called by the `parse` function after a tracked `directory` that has been moved from `oldDirectoryPath` has been updated.
  * Return value isn't used.
- * `userdata` as provided to the `parse` function.
  
-#### onDirectoryForgottenCB(userdata, directory) `optional`
+#### onDirectoryForgottenCB(directory) `optional`
  
  * If defined, called by the `forget` function just before a tracked `directory` is forgot. 
  * Return value isn't used.
- * `userdata` as provided to the `parse` function.
  
-#### onFileAddedBeforeCB(userdata, filename) `optional`
+#### onFileAddedBeforeCB(filename) `optional`
 
  * Called by the `parse` function for each file that has no record in `fileCollection`.
- * File is named `filename` and its parent directory informations can be found in `userdata.astr.parentDir`.
+ * File is named `filename` and its parent directory informations can be found in `this.astr.parentDir`.
  * Return value controls whether a record should be inserted in `fileCollection` for this file (`true`) or not (`false`).
  * If this callback is not defined, all files will be tracked.
  * No record is called for tracker files named `params.idFilename`.
- * `userdata` as provided to the `parse` function.
  
-#### onFileAddedAfterCB(userdata, file) `optional`
+#### onFileAddedAfterCB(file) `optional`
 
  * If defined, called by the `parse` function just after the `file` object has been inserted to the `fileCollection`.
  * Return value isn't used.
- * `userdata` as provided to the `parse` function.
  
-#### onFileDeletedCB(userdata, file) `optional`
+#### onFileDeletedCB(file) `optional`
 
  * Called by the `parse` function for each tracked `file` that is missing on the filesystem
  * Return value controls whether the `file` is removed from database (`true`) or keeped with a null source (`false`).
  * If this callback is not defined, all missing files will be removed from database.
- * `userdata` as provided to the `parse` function.
  
-#### onFileChangedCB(userdata, ) `optional`
+#### onFileChangedCB() `optional`
 
  * If defined, called by the `parse` function for each `file` whose modification time is newer than the last parse time
- * `userdata` as provided to the `parse` function.
  
-#### onFileForgottenCB(userdata, file) `optional`
+#### onFileForgottenCB(file) `optional`
  
  * If defined, called by the `forget` function just before a tracked `file` is forgot.
  * Return value isn't used.
- * `userdata` as provided to the `parse` function.
 
+#### Additional properties
 
-### parse(params, userdata)
+Additionnal properties can be added to the parameters object, at user's discretion.
+Those extra properties will be accessible in read/write in any of the callbacks through `this`.
+Those properties are depth-linked. For example if you store the directory path in the `onDirectoryAddedBeforeCB`, and you read it in `onFileAddedBeforeCB` you will always get the correct parent's directory path, even if there were some nested subfolders that have been added between the two calls.
+This is done by backuping recursively the extra own properties each time we parse deeper:
+
+  * Extra properties should ideally be as flat and light as possible (for instance, not a meteor Collection !, which is big and recursive), otherwise it will be slow or not work at all (let me know).
+  * If the param object inherits from something, the inherited properties won't get backuped. This can be exploited to store global user data that must not be depth-linked.
+
+### parse(params)
 
 Recursively parse the folders of a given `source`, and update both `fileCollection` and `directoryCollection`.
-Call callbacks defined in `params` for various usecases.
-`userdata` can hold data needed by one of those callbacks. It can not objects containing prototypes or functions as the userdata may be deep cloned during the parsing
+Call callbacks defined in `params` for various usecases. 
 
-### forget(params, userdata)
+### forget(params)
 
 Recursively remove all tracker files in the folders of a given `source`, and remove every record corresponding to elements of this source in both `fileCollection` and `directoryCollection`.
 Call callbacks defined in `params` for various usecases.
-`userdata` can hold anything that is needed by one of those callbacks.
 
 ### checkParams(params)
 
@@ -149,3 +150,11 @@ Will check that provided params are valid, and create default values for missing
 [ ] Remove `recursive-fs` dependency that is only used in tests
 [ ] Add depth control `maxDepth` to recursive parsing
 [ ] Add function to use filesystem events instead of periodical reparsing
+
+
+Changelog
+---------
+ * 0.2.0
+ 	* Use additional params properties instead of userdata extra arg to all callbacks.
+ * 0.1.0
+ 	* Update to official meteor packaging system

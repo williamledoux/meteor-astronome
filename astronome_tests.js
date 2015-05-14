@@ -85,7 +85,6 @@ function IsWrongSourcePathError(actual)										{ if(actual.error === Astronome
 function IsSourceNotFoundError(actual)										{ if(actual.error === Astronome.messages.SourceNotFound.error)										{ return true; } else { console.log(actual);	return false; } }
 function IsInvalidDirectoryCollectionError(actual)				{ if(actual.error === Astronome.messages.InvalidDirectoryCollection.error)				{ return true; } else { console.log(actual);	return false; } }
 function IsInvalidFileCollectionError(actual)							{ if(actual.error === Astronome.messages.InvalidFileCollection.error)							{ return true; } else { console.log(actual);	return false; } }
-function IsUserdataMustBeObjectError(actual)							{ if(actual.error === Astronome.messages.UserdataMustBeObject.error)							{ return true; } else { console.log(actual);	return false; } }
 function IsMissingDirectoryInDatabaseError(actual)				{ if(actual.error === Astronome.messages.MissingDirectoryInDatabase.error)				{ return true; } else { console.log(actual);	return false; } }
 function IsFailedToInsertDirectoryInDatabaseError(actual)	{ if(actual.error === Astronome.messages.FailedToInsertDirectoryInDatabase.error)	{ return true; } else { console.log(actual);	return false; } }
 function IsFailedToWriteIdTrackerFileError(actual)				{ if(actual.error === Astronome.messages.FailedToWriteIdTrackerFile.error)				{ return true; } else { console.log(actual);	return false; } }
@@ -207,14 +206,6 @@ function IsFailedToForgetNotSourceDirectoryError(actual)	{ if(actual.error === A
 
 	//-------------------------------------------
 	
-	Tinytest.add("Astronome - parse - parsing: should throw error if invalid userdata", function(test){
-		var params = getDefaultParams(test, sourceADir);
-		test.throws(function(){ Astronome.parse(params, ["a","b"]); }, IsUserdataMustBeObjectError);
-		test.throws(function(){ Astronome.parse(params, 42); }, IsUserdataMustBeObjectError);
-	});
-
-	//-------------------------------------------
-	
 	Tinytest.add("Astronome - parse - parsing: should add source dir to database without calling callbacks", function(test){
 		var params = getDefaultParams(test, sourceADir);
 		Astronome.parse(params);
@@ -223,7 +214,6 @@ function IsFailedToForgetNotSourceDirectoryError(actual)	{ if(actual.error === A
 		var dir = Directories.findOne(id);
 		test.equal(id, dir._id);
 	});
-
 	//-------------------------------------------
 
 	Tinytest.addAsync("Astronome - parse - mkdir dirA + parse: should update db and call callbacks with correct userdata", function(test, onComplete){
@@ -232,20 +222,18 @@ function IsFailedToForgetNotSourceDirectoryError(actual)	{ if(actual.error === A
 		// Create the directory:
 		test.isUndefined(fs.mkdirSync(sourceADir+'dirA'));
 		//---
-		var u={"foo":42};
-		//---
 		// Parse
 		var params = getDefaultParams(test, sourceADir);
+		params.foo=42;
 		params.onDirectoryAddedBeforeCB = CBW.wrapCB("onDirectoryAddedBeforeCB", [0], true);
-		params.onDirectoryAddedAfterCB = CBW.wrapCB("onDirectoryAddedAfterCB", [1], function(userdata, dir, iCall){
-			test.equal(u.foo, 42, "userdata was lost");
+		params.onDirectoryAddedAfterCB = CBW.wrapCB("onDirectoryAddedAfterCB", [1], function(dir, iCall){
+			test.equal(this.foo, 42, "userdata was lost");
 			checkDirectoryState(test, params.idFilename, "", "dirA", dir);
 		});
-		Astronome.parse(params, u);
+		Astronome.parse(params);
 		//---
 		CBW.wait(onComplete, 0);
 	});
-
 	//-------------------------------------------
 
 	Tinytest.add("Astronome - parse - parsing: shouldn't call any callback", function(test){
@@ -264,14 +252,13 @@ function IsFailedToForgetNotSourceDirectoryError(actual)	{ if(actual.error === A
 		// Parse
 		var params = getDefaultParams(test, sourceADir);
 		params.onDirectoryAddedBeforeCB = CBW.wrapCB("onDirectoryAddedBeforeCB", [0], true);
-		params.onDirectoryAddedAfterCB = CBW.wrapCB("onDirectoryAddedAfterCB", [1], function(userdata, dir, iCall){
+		params.onDirectoryAddedAfterCB = CBW.wrapCB("onDirectoryAddedAfterCB", [1], function(dir, iCall){
 			checkDirectoryState(test, params.idFilename, "", "dirB", dir);
 		});
 		Astronome.parse(params);
 		//---
 		CBW.wait(onComplete, 10); // wait to see if too many callbacks are called
 	});
-
 	//-------------------------------------------
 
 	Tinytest.addAsync("Astronome - parse - mkdir sub and sub sub dirs in A and B + parse: should only call the add callbacks for each dir", function(test, onComplete){
@@ -286,7 +273,7 @@ function IsFailedToForgetNotSourceDirectoryError(actual)	{ if(actual.error === A
 		// Parse
 		var params = getDefaultParams(test, sourceADir);
 		params.onDirectoryAddedBeforeCB = CBW.wrapCB("onDirectoryAddedBeforeCB", [0, 2, 4, 6], true);
-		params.onDirectoryAddedAfterCB = CBW.wrapCB("onDirectoryAddedAfterCB", [1, 3, 5, 7], function(userdata, dir, iCall){
+		params.onDirectoryAddedAfterCB = CBW.wrapCB("onDirectoryAddedAfterCB", [1, 3, 5, 7], function(dir, iCall){
 			switch(iCall){
 				case 0: checkDirectoryState(test, params.idFilename, "dirA"		, "subC", dir); break;
 				case 1: checkDirectoryState(test, params.idFilename, "subC"	, "subsubD", dir); break;
@@ -335,9 +322,8 @@ function IsFailedToForgetNotSourceDirectoryError(actual)	{ if(actual.error === A
 		// Parse
 		var params = getDefaultParams(test, sourceADir);
 		params.onDirectoryMovedCB = CBW.wrapCB("onDirectoryMovedCB", 2, function(args){
-			var userdata=args[0];
-			var dir=args[1];
-			var olddirPath=args[2];
+			var dir=args[0];
+			var olddirPath=args[1];
 			switch(args.iCall){
 				case 0:
 					test.notEqual(olddirPath.indexOf("dirB"),-1);
@@ -392,6 +378,8 @@ function IsFailedToForgetNotSourceDirectoryError(actual)	{ if(actual.error === A
 		//---
 		var params = getDefaultParams(test, sourceADir);
 
+		var oldFolderCount = Directories.find({}).count();
+		var oldFileCount = Files.find({}).count();
 		test.isUndefined(fs.unlinkSync(sourceADir+'dirA/subE/fileE'));
 		test.isUndefined(fs.unlinkSync(sourceADir+'dirA/subE/'+params.idFilename));
 		test.isUndefined(fs.unlinkSync(sourceADir+'dirA/subE/subsubF/fileF'));
@@ -404,6 +392,9 @@ function IsFailedToForgetNotSourceDirectoryError(actual)	{ if(actual.error === A
 		Astronome.parse(params);
 		//---
 		CBW.wait(onComplete, 10); // wait to see if too many callbacks are called
+		//---
+		test.equal(Directories.find({}).count(), oldFolderCount-2, "the 2 deleted folders should have been removed from database");
+		test.equal(Files.find({}).count(), oldFileCount-2, "the 2 deleted files should have been removed from database");
 	});
 
 	//-------------------------------------------
