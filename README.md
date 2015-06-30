@@ -1,4 +1,4 @@
-# Astronome v0.2.0
+# Astronome v0.3.0
 
 Meteor server-side package for populating `Meteor.Collections` with informations on existing system directories and files, without touching (almost) anything, and without preventing normal interaction with those files and directories through filesystem. 
 
@@ -29,7 +29,7 @@ Usecases: indexing and adding metadatas to personnal files (pictures, videos, wh
 				'onDirectoryAddedAfterCB'		: function(directory){ Directories.update(directory, {some:metadatas});},
 				'onDirectoryDeletedCB'			: function(directory){ return true; },
 				'onDirectoryMovedCB'				: function(directory, olddirectorypath){ },
-				'onFileAddedBeforeCB'				: function(filefullpath){ return true},
+				'onFileAddedBeforeCB'				: function(filefullpath, basename, extension){return true},
 				'onFileAddedAfterCB'				: function(file){ },
 				'onFileDeletedCB'						: function(file){ console.log(this.someUserData); },
 				'onFileChangedCB'						: function(file){ },
@@ -93,10 +93,11 @@ Must be a string containing the name of the file that will be created in each su
 * If defined, called by the `forget` function just before a tracked `directory` is forgot. 
 * Return value isn't used.
  
-#### onFileAddedBeforeCB(filename) `optional`
+#### onFileAddedBeforeCB(filename, basename, extension) `optional`
 
 * Called by the `parse` function for each file that has no record in `fileCollection`.
-* File is named `filename` and its parent directory informations can be found in `this.astr.parentDir`.
+* File is named `filename` (`basename`.`extension`) and its parent directory informations can be found in `this.astr.parentDir`.
+* File's `basename` and `extension` are also provided and will be stored in `fileCollection`.
 * Return value controls whether a record should be inserted in `fileCollection` for this file (`true`) or not (`false`).
 * If this callback is not defined, all files will be tracked.
 * No record is called for tracker files named `params.idFilename`.
@@ -154,7 +155,9 @@ Will check that provided params are valid, and create default values for missing
 
 Changelog
 ---------
+* 0.2.1
+	- Add `basename` and `extension` to the File collection and as argument to the `onFileAddedBeforeCB` callback
 * 0.2.0
-* Use additional params properties instead of userdata extra arg to all callbacks.
+	- Use additional params properties instead of userdata extra arg to all callbacks.
 * 0.1.0
-* Update to official meteor packaging system
+	- Update to official meteor packaging system

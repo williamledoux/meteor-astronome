@@ -190,6 +190,8 @@ Astronome = (function(){
 		return dir;
 	};
 	//-----------------------------------------------------------------------------
+	var extensionRegexp = new RegExp(/([^.]+)\.(.*)$/);
+	//-----------------------------------------------------------------------------
 	var processFile = function(p, dir, sFileName, mtime){
 		if(sFileName===p.idFilename)
 			return;
@@ -219,14 +221,19 @@ Astronome = (function(){
 				}
 			);
 		}else{
+			var result=sFileName.match(extensionRegexp);
+			var basename = result[1];
+			var extension = result[2];
 			//console.log("[processNewFile] "+ sFileName);
-			if(!p.onFileAddedBeforeCB || p.onFileAddedBeforeCB(sFileName)){
+			if(!p.onFileAddedBeforeCB || p.onFileAddedBeforeCB(sFileName, basename, extension)){
 				//------------------------------
 				var fileID = p.fileCollection.insert({
 					'astr':{
 						'sourceId'				: p.astr.sourceId,
 						'parentId'				: dir._id,
 						'filename'				: sFileName,
+						'basename'				: basename,
+						'extension'				: extension,
 						'mtime'						: mtime,
 						'lastParsedTime'	: p.astr.updateTime
 					}
@@ -432,12 +439,16 @@ Astronome = (function(){
 			var dir = sourceDirs[iSourceDir];
 			if(p.onDirectoryForgottenCB)
 				p.onDirectoryForgottenCB(dir);
-			fs.unlinkSync(dir.astr.dirPath+p.idFilename);
+			try{
+				fs.unlinkSync(dir.astr.dirPath+p.idFilename);
+			}catch(e){}
 		}
 		p.directoryCollection.remove({'astr.sourceId':rootDir._id});
 		
 		// forget source
-		fs.unlinkSync(rootDir.astr.dirPath+p.idFilename);
+		try{
+			fs.unlinkSync(rootDir.astr.dirPath+p.idFilename);
+		}catch(e){}
 		p.directoryCollection.remove(rootDir);
 	};
 	//-----------------------------------------------------------------------------
