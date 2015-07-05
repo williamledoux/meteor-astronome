@@ -212,7 +212,7 @@ Astronome = (function(){
 				p.onFileChangedCB(file);
 			}
 			// update lastParsedTime in order to detect deleted files
-			p.fileCollection.update(file, {
+			p.fileCollection.update(file._id, {
 					$set:{
 						'astr.sourceId'				: p.astr.sourceId,
 						'astr.mtime'					: mtime,
