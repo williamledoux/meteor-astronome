@@ -75,7 +75,7 @@ Must be a string containing the name of the file that will be created in each su
 #### onDirectoryAddedAfterCB(directory) `optional`
  
 * If defined, called by the `parse` function just after the `directory` object has been inserted to the `directoryCollection`.
-* Return value isn't used.
+* Return value controls whether this directory should be kept (`true`) or removed (`false`) in database.
  
 #### onDirectoryDeletedCB(directory) `optional`
 
@@ -86,7 +86,7 @@ Must be a string containing the name of the file that will be created in each su
 #### onDirectoryMovedCB(directory, oldDirectoryPath) `optional`
 
 * If defined, called by the `parse` function after a tracked `directory` that has been moved from `oldDirectoryPath` has been updated.
-* Return value isn't used.
+* Return value controls whether this directory should be kept (`true`) or removed (`false`) in database.
  
 #### onDirectoryForgottenCB(directory) `optional`
  
@@ -105,7 +105,7 @@ Must be a string containing the name of the file that will be created in each su
 #### onFileAddedAfterCB(file) `optional`
 
 * If defined, called by the `parse` function just after the `file` object has been inserted to the `fileCollection`.
-* Return value isn't used.
+* Return value controls whether this file should be kept (`true`) or removed (`false`) in database.
  
 #### onFileDeletedCB(file) `optional`
 
@@ -116,7 +116,8 @@ Must be a string containing the name of the file that will be created in each su
 #### onFileChangedCB() `optional`
 
 * If defined, called by the `parse` function for each `file` whose modification time is newer than the last parse time
- 
+* Return value controls whether this file should be kept (`true`) or removed (`false`) in database.
+
 #### onFileForgottenCB(file) `optional`
  
 * If defined, called by the `forget` function just before a tracked `file` is forgot.
@@ -155,7 +156,10 @@ Will check that provided params are valid, and create default values for missing
 
 Changelog
 ---------
-* 0.2.1
+* 0.3.0
+	- Better handling of cases were tracked folder are missing from database (or exist in databases and are untracked on disk)
+	- `onDirectoryAddedAfterCB` `onDirectoryMovedCB` must return true upon completion, otherwise the concerned directory will get untracked.
+	- `onFileChangedCB` `onFileAddedAfterCB` must return true upon completion, otherwise the concerned file will get untracked.
 	- Add `basename` and `extension` to the File collection and as argument to the `onFileAddedBeforeCB` callback
 * 0.2.0
 	- Use additional params properties instead of userdata extra arg to all callbacks.

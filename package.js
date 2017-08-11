@@ -4,7 +4,7 @@ Npm.depends({
 
 Package.describe({
   summary: "server side tools to maintain collections that track the system files and folders",
-  version: "0.2.1",
+  version: "0.3.0",
   name: "williamledoux:astronome",
   git: "https://github.com/williamledoux/meteor-astronome.git",
 });

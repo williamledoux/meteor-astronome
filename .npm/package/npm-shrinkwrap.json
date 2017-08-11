@@ -1,7 +1,9 @@
 {
   "dependencies": {
     "recursive-fs": {
-      "version": "0.1.3"
+      "version": "0.1.3",
+      "resolved": "https://registry.npmjs.org/recursive-fs/-/recursive-fs-0.1.3.tgz",
+      "from": "recursive-fs@https://registry.npmjs.org/recursive-fs/-/recursive-fs-0.1.3.tgz"
     }
   }
 }

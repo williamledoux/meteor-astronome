@@ -53,6 +53,10 @@ Astronome = (function(){
 		FailedToForgetNotSourceDirectory:{
 			error		: 1485,
 			reason	: 'cannot forget a directory that is not a source'
+		},
+		DuplicateDirectoryInDatabase:{
+			error		: 1486,
+			reason	: 'Directory is present multiple times in database'
 		}
 	};
 	//-----------------------------------------------------------------------------
@@ -60,6 +64,10 @@ Astronome = (function(){
 		//throw new Meteor.Error(e.error, '[Astronome: '+e.reason+details?(' - '+details):''+']', details?details:'');
 		var d=details?details:'';
 		throw new Meteor.Error(e.error, '[Astronome] '+e.reason+':'+d, d);
+	};
+	//-----------------------------------------------------------------------------
+	var logMeteorInfo = function(message){
+		console.log('[Astronome] '+message);
 	};
 	//-----------------------------------------------------------------------------
 	var defaultParams = {
@@ -128,20 +136,31 @@ Astronome = (function(){
 		if(!fs.existsSync(idPath)){
 			//console.log("processing new "+fullpath);
 			if( bRootDir || !p.onDirectoryAddedBeforeCB || p.onDirectoryAddedBeforeCB(fullpath) ){
-				dirId = p.directoryCollection.insert({
-					'astr':{
-						'sourceId'					: p.astr.sourceId,
-						'parentId'					: p.astr.parentDir._id,
-						'dirPath'						: fullpath,
-						'lastParsedTime'		: p.astr.updateTime
-					}
-				});
-				if(!dirId){
-					throwMeteorError(E.FailedToInsertDirectoryInDatabase);
+				var MatchingDirs = p.directoryCollection.find({"astr.dirPath":fullpath}).fetch();
+				switch(MatchingDirs.length){
+					case 0:
+						dirId = p.directoryCollection.insert({
+							'astr':{
+								'sourceId'					: p.astr.sourceId,
+								'parentId'					: p.astr.parentDir._id,
+								'dirPath'						: fullpath
+							}
+						});
+						if(!dirId){
+							throwMeteorError(E.FailedToInsertDirectoryInDatabase);
+						}
+						break;
+					case 1:
+						dirId = MatchingDirs[0]._id;
+						logMeteorInfo("Taking id "+dirId+" from existing record in database for "+fullpath);
+						break;
+					default:	
+						throwMeteorError(E.DuplicateDirectoryInDatabase);
 				}
 				dir = p.directoryCollection.findOne(dirId);
 				if(!dir)
 					throwMeteorError(E.MissingDirectoryInDatabase, fullpath);
+				p.directoryCollection.update(dirId, {$set:{"astr.lastParsedTime":p.astr.updateTime}})
 				if(!dir.astr)
 					throwMeteorError(E.CorruptedDirectoryInDatabase);
 				//console.log("writing id file "+idPath+" with content "+dirId);
@@ -149,17 +168,34 @@ Astronome = (function(){
 					throwMeteorError(E.FailedToWriteIdTrackerFile);
 				}
 				if(!bRootDir && p.onDirectoryAddedAfterCB){
-					p.onDirectoryAddedAfterCB(dir);
+					if(!p.onDirectoryAddedAfterCB(dir)){
+						p.directoryCollection.remove(dirId);
+						return null;
+					}
 				}
 			}else{
 				return null;
 			}
 		}else{
-			//console.log("processing existing "+fullpath);
 			dirId = ''+fs.readFileSync(idPath);
 			dir = p.directoryCollection.findOne(dirId);
-			if(!dir)
-				throwMeteorError(E.MissingDirectoryInDatabase, fullpath);
+			if(!dir){
+				var MatchingDirs = p.directoryCollection.find({"astr.dirPath":fullpath}).fetch();
+				switch(MatchingDirs.length){
+					case 0:
+						throwMeteorError(E.MissingDirectoryInDatabase, fullpath);
+						break;
+					case 1:
+						dir = MatchingDirs[0];
+						logMeteorInfo("Replacing not found id "+dirId+" on disk with "+dir._id+" from existing record in database for "+fullpath);
+						dirId = dir._id;
+						if(fs.writeFileSync(idPath, dir._id))
+							throwMeteorError(E.FailedToWriteIdTrackerFile);
+						break;
+					default:
+						throwMeteorError(E.DuplicateDirectoryInDatabase, fullpath);	
+				}
+			}
 			if(!dir.astr)
 				throwMeteorError(E.CorruptedDirectoryInDatabase);
 			var olddirPath = dir.astr.dirPath;
@@ -168,24 +204,25 @@ Astronome = (function(){
 					$set:{
 						'astr.sourceId'				: p.astr.sourceId,
 						'astr.parentId'				: p.astr.parentDir._id,
-						'astr.dirPath'				: fullpath,
-						'astr.lastParsedTime'	: p.astr.updateTime
+						'astr.dirPath'				: fullpath
 					}
 				});
 				dir = p.directoryCollection.findOne(dirId);
 				if(!dir)
 					throwMeteorError(E.MissingDirectoryInDatabase, fullpath);
 				if(!bRootDir && p.onDirectoryMovedCB){
-					p.onDirectoryMovedCB(dir, olddirPath);
+					if(!p.onDirectoryMovedCB(dir, olddirPath)){
+						p.directoryCollection.remove(dir._id);
+						return null;
+					}
 				}
-			}else{
-				// In any case, update the last parsed time
-				p.directoryCollection.update(dirId, {
-						$set:{
-							'astr.lastParsedTime'	: p.astr.updateTime
-						}
-				});
 			}
+			// In any case, update the last parsed time
+			p.directoryCollection.update(dirId, {
+					$set:{
+						'astr.lastParsedTime'	: p.astr.updateTime
+					}
+			});
 		}
 		return dir;
 	};
@@ -209,7 +246,9 @@ Astronome = (function(){
 			//console.log("[processExistingFile] "+ sFileName+" last changed on "+file.astr.mtime+" vs "+mtime);
 			// compare mtime from database to filesystem to check if it has changed or not
 			if(p.onFileChangedCB && file.astr.mtime < mtime){
-				p.onFileChangedCB(file);
+				if(!p.onFileChangedCB(file)){
+					p.fileCollection.remove(file._id);
+				}
 			}
 			// update lastParsedTime in order to detect deleted files
 			p.fileCollection.update(file._id, {
@@ -242,11 +281,12 @@ Astronome = (function(){
 					throwMeteorError(E.FailedToInsertFileInDatabase);
 				if(p.onFileAddedAfterCB){
 					file = p.fileCollection.findOne(fileID);
-					return p.onFileAddedAfterCB(file);
+					if(!p.onFileAddedAfterCB(file)){
+						p.fileCollection.remove(file._id);
+					}
 				}
 			}
 		}
-		return false;
 	};
 	//-----------------------------------------------------------------------------
 	var recursive_backup = function(objA, history){
@@ -262,24 +302,24 @@ Astronome = (function(){
 		history.push({"a":objA, "b":objB });
 
 		for (var attr in objA) {
-		  if (objA.hasOwnProperty(attr) && !defaultParams.hasOwnProperty(attr)){
-		  	if(Object.getOwnPropertyDescriptor(objA, attr).writable){
-			  	if(objA[attr] && typeof objA[attr]==="object"){
-			  		var bFound=false;
-			  		for(var h=0; h<history.length; ++h){
-			  			if(history[h].a === objA[attr] ){
-			  				objB[attr] = history[h].b;
-			  				bFound=true;
-			  			}
-			  		}
-			  		if(!bFound){
-			  			objB[attr]=recursive_backup(objA[attr], history);
-			  		}
-			  	}else{
-			  		objB[attr] = objA[attr];
-			  	}
-			  }
-		  }
+			if (objA.hasOwnProperty(attr) && !defaultParams.hasOwnProperty(attr)){
+				if(Object.getOwnPropertyDescriptor(objA, attr).writable){
+					if(objA[attr] && typeof objA[attr]==="object"){
+						var bFound=false;
+						for(var h=0; h<history.length; ++h){
+							if(history[h].a === objA[attr] ){
+								objB[attr] = history[h].b;
+								bFound=true;
+							}
+						}
+						if(!bFound){
+							objB[attr]=recursive_backup(objA[attr], history);
+						}
+					}else{
+						objB[attr] = objA[attr];
+					}
+				}
+			}
 		}
 		return objB;
 	}
@@ -298,22 +338,22 @@ Astronome = (function(){
 		history.push({"b":bkp, "o":org});
 
 		for (var attr in bkp) {
-		  if (bkp.hasOwnProperty(attr)){
-		  	if(bkp[attr] && typeof bkp[attr]==="object"){
-		  		var bAlreadyRestored=false;
-		  		for(var h=0; h<history.length; ++h){
-		  			if(history[h].b === bkp[attr] ){
-		  				org[attr] = history[h].o;
-		  				bAlreadyRestored=true;
-		  			}
-		  		}
-		  		if(!bAlreadyRestored){
-		  			recursive_restore(org[attr], bkp[attr], history);
-		  		}
-		  	}else{
-		  		org[attr] = bkp[attr];
-		  	}
-		  }
+			if (bkp.hasOwnProperty(attr)){
+				if(bkp[attr] && typeof bkp[attr]==="object"){
+					var bAlreadyRestored=false;
+					for(var h=0; h<history.length; ++h){
+						if(history[h].b === bkp[attr] ){
+							org[attr] = history[h].o;
+							bAlreadyRestored=true;
+						}
+					}
+					if(!bAlreadyRestored){
+						recursive_restore(org[attr], bkp[attr], history);
+					}
+				}else{
+					org[attr] = bkp[attr];
+				}
+			}
 		}
 	}
 	//-----------------------------------------------------------------------------
@@ -396,6 +436,7 @@ Astronome = (function(){
 		}
 		
 		// Clean database 
+		//logMeteorInfo("Cleaning Database");
 		p.directoryCollection.remove({'_id':{'$in':dirsToDeleteIds}});
 		p.fileCollection.remove({'_id':{'$in':filesToDeleteIds}});
 		p.directoryCollection.update(
